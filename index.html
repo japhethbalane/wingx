@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Demo</title>
+	<style type="text/css">
+		canvas {
+			display: block;
+		}
+		body {
+			margin: 0;
+		}
+	</style>
+</head>
+<body>
+
+	<canvas>
+		Sorry, canvas is not supported...
+	</canvas>
+
+	<script type="text/javascript">
+		
+		////////////////////////////////////////// start
+
+		var canvas = document.querySelector('canvas');
+		var context = canvas.getContext('2d');
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+		setInterval(main, 10);
+
+		function initialize() {
+			character = new Character();
+			border = new Border();
+			enemies = [];
+			bullets = [];
+			particles = [];
+			score = 0;
+			isPlaying = false;
+
+			for (var i = 0; i < 10; i++) {		// populates the enemies array
+				enemies.push(new Enemy());
+			}
+
+			for (var i = 0; i < 100; i++) {		// populates the particles array
+				particles.push(new Particle());
+			}
+		}
+		initialize();
+
+		////////////////////////////////////////// the main loop :)
+
+		function main() {
+			clearCanvas(); 						// draw the background
+			
+			if (!isPlaying) { 					// intro
+				drawTitle();
+			} else { 							// draw enemy and bullet
+				drawScore();
+				for (var i = 0; i < enemies.length; i++) {
+					enemies[i].update().draw();
+				}
+				for (var i = 0; i < bullets.length; i++) {
+					bullets[i].update().draw();
+				}
+			}
+
+			character.isValidPosition().draw(); // draw character
+			border.draw(); // draw border
+			for (var i = 0; i < particles.length; i++) { // draw particles
+				particles[i].update().draw();
+			}
+		}
+
+		////////////////////////////////////////// utility functions
+
+		function clearCanvas() {
+			context.fillStyle = 'rgba(100,0,0,0.1)';
+			context.fillRect(0, 0, canvas.width, canvas.height);
+		}
+
+		function randomBetween(min, max) {
+			return Math.floor(Math.random() * (max - min) + min);
+		}
+
+		function getDistance(x1, y1, x2, y2) {
+			var x = Math.abs(x1 - x2);
+			var y = Math.abs(y1 - y2);
+			return Math.sqrt((x * x) + (y * y));
+		}
+
+		function drawTitle() {
+			// draw things for title screen here
+			context.fillStyle = 'white';
+
+			context.font = '50px Arial';
+			context.fillText('hello world!', 20, 100);
+
+			context.font = '20px Arial';
+			context.fillText('( click to start )', 20, 140);
+		}
+
+		function drawScore() {
+			// draw things for title screen here
+			context.fillStyle = 'white';
+
+			context.font = '50px Arial';
+			context.fillText('score : '+score, 20, 100);
+		}
+
+		////////////////////////////////////////// objects
+
+		function Character() {
+			this.x = canvas.width/2;
+			this.y = canvas.height/4 * 3;
+			this.radius = 30;
+
+			this.fire = function(x, y) {
+				this.isValidPosition();
+				bullets.push(new Bullet(this.x, this.y));
+			}
+
+			this.isValidPosition = function() {
+				if (this.x - this.radius < border.minLimit) {
+					this.x = border.minLimit + this.radius;
+				}
+				if (this.x + this.radius > border.maxLimit) {
+					this.x = border.maxLimit - this.radius;
+				}
+				return this;
+			}
+
+			this.draw = function() {
+				// draw the character
+				context.fillStyle = 'white';
+				context.beginPath();
+				context.arc(this.x, this.y, this.radius, Math.PI*2, false);
+				context.fill();
+			}
+		}
+
+		function Border() {
+			this.minLimit = canvas.width/2 - 350;
+			this.maxLimit = canvas.width/2 + 350;
+
+			this.draw = function() {
+				context.strokeStyle = 'white';
+
+				context.beginPath();
+				context.moveTo(this.minLimit, 0);
+				context.lineTo(this.minLimit, canvas.height);
+				context.stroke();
+
+				context.beginPath();
+				context.moveTo(this.maxLimit, 0);
+				context.lineTo(this.maxLimit, canvas.height);
+				context.stroke();
+			}
+		}
+
+		function Enemy() {
+			this.radius = 25;
+			this.x = randomBetween(border.minLimit + this.radius, border.maxLimit - this.radius);
+			this.y = randomBetween(0, -canvas.height);
+			this.speed = randomBetween(1, 5);
+			this.direction = randomBetween(0,2) == 0 ? 1 : -1;
+
+			this.delete = function() {
+				this.x = randomBetween(border.minLimit + this.radius, border.maxLimit - this.radius);
+				this.y = randomBetween(0, -canvas.height);
+			}
+
+			this.checkHitCharacter = function() {
+				if ((character.radius + this.radius)
+					>= getDistance(character.x, character.y, this.x, this.y) ) {
+					// game over
+					initialize(); // end game
+				}
+			}
+
+			this.checkHitBullet = function() {
+				for (var i = 0; i < bullets.length; i++) {
+					if (bullets[i].radius + this.radius
+						>= getDistance(bullets[i].x, bullets[i].y, this.x, this.y) ) {
+						// enemies.push(new Enemy()); // add new Enemy()
+						score++; // add score
+						this.delete(); // delete this
+						bullets.splice(i, 1); // remove bullet that hit the enemy
+					}
+				}
+			}
+
+			this.update = function() {
+				this.y += this.speed;
+				this.x += this.speed * this.direction;
+				if (this.y - this.radius > canvas.height) {
+					this.y = 0 - this.radius;
+					this.x = randomBetween(border.minLimit + this.radius, border.maxLimit - this.radius);
+				}
+				if (this.x - this.radius < border.minLimit ||
+					this.x + this.radius > border.maxLimit) {
+					this.direction *= -1;
+				}
+				this.checkHitCharacter();
+				this.checkHitBullet();
+				return this;
+			}
+
+			this.draw = function() {
+				context.fillStyle = 'white';
+				context.beginPath();
+				context.arc(this.x, this.y, this.radius, Math.PI*2, false);
+				context.fill();
+			}
+		}
+
+		function Bullet(x, y) {
+			this.x = x;
+			this.y = y;
+			this.radius = 15;
+			this.speed = 3;
+
+			this.update = function() {
+				this.y -= this.speed;
+				 return this;
+			}
+
+			this.draw = function() {
+				context.fillStyle = 'white';
+				context.strokeStyle = 'white';
+
+				context.beginPath();
+				context.arc(this.x, this.y, this.radius, Math.PI*2, false);
+				context.stroke();
+
+				context.beginPath();
+				context.arc(this.x, this.y, this.radius / 3, Math.PI*2, false);
+				context.fill();
+			}
+		}
+		
+		function Particle() {
+			this.radius = 3;
+			this.x = randomBetween(border.minLimit + this.radius, border.maxLimit - this.radius);
+			this.y = randomBetween(0, canvas.height);
+			this.speed = 1;
+
+			this.update = function() {
+				this.y += this.speed;
+				if (this.y > canvas.height) {
+					this.y = 0;
+				}
+				return this;
+			}
+
+			this.draw = function() {
+				context.fillStyle = 'white';
+				context.beginPath();
+				context.arc(this.x, this.y, this.radius, Math.PI*2, false);
+				context.fill();
+			}
+		}
+
+		////////////////////////////////////////// events
+
+		canvas.addEventListener('mousemove', function(e) {
+			character.x = e.pageX;
+			character.y = e.pageY;
+		});
+
+		canvas.addEventListener('click', function(e) {
+			if (!isPlaying) { // start game
+				isPlaying = true;
+			} else { // fire
+				character.fire(e.pageX, e.pageY);
+			}
+		});
+
+		////////////////////////////////////////// end
+
+	</script>
+</body>
+</html>
